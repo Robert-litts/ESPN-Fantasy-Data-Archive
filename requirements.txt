@@ -1,0 +1,4 @@
+pyscopg2-binary
+sqlalchemy
+espn-api
+alembic
