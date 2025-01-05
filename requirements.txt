@@ -1,4 +1,4 @@
-pyscopg2-binary
+psycopg2-binary
 sqlalchemy
-espn-api
+git+https://github.com/Robert-litts/espn-api.git@2018-api-update
 alembic
