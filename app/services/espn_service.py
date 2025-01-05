@@ -23,69 +23,78 @@ def get_db_session():
 
 
 def fetch_and_populate_draft(start_year, end_year):
-    db = next(get_db())
+    batch_size = 1000
+    picks_to_upsert = []
 
     try:
-        for year in range(start_year, end_year + 1):
-            # Initialize the league object with your league ID and year
-            league = League(LEAGUE_ID, year=year, swid=SWID, espn_s2=ESPN_S2)
-            teams = league.teams
-            # Iterate through the teams and insert them into the database
-            for team in teams:
+        with get_db_session() as db:
+            for year in range(start_year, end_year + 1):
+                try:
+                    league = League(LEAGUE_ID, year=year, swid=SWID, espn_s2=ESPN_S2)
+                    draft = league.draft
+                    for pick_index, pick in enumerate(draft, 1):
 
-                new_team = Team (
+                        #Query the database to get the player ID from 'players' table and team id
 
-                    league_id = LEAGUE_ID,
-                    team_id = team.team_id,
-                    team_abbrev = team.team_abbrev,
-                    team_name = team.team_name,
-                    division_id = team.division_id,
-                    division_name = team.division_name,
-                    wins = team.wins,
-                    losses = team.losses,
-                    ties = team.ties,
-                    points_for = team.points_for,
-                    points_against = team.points_against,
-                    waiver_rank = team.waiver_rank,
-                    acquisitions = team.acquisitions,
-                    acquisition_budget_spent = team.acquisition_budget_spent,
-                    drops = team.drops,
-                    trades = team.trades,
-                    # owners = team.owners,
-                    # stats = team.stats,
-                    streak_type = team.streak_type,
-                    streak_length = team.streak_length,
-                    standing = team.standing,
-                    final_standing = team.final_standing,
-                    draft_projected_rank = team.draft_projected_rank,
-                    playoff_pct = team.playoff_pct,
-                    logo_url = team.logo_url,
-                    # schedule = team.schedule,
-                    # scores = team.scores,
-                    # outcomes = team.outcomes
-                )
-             # Insert the team into the database
-                db.add(new_team)
-                db.commit()
-                print(f"Inserted team: ID={team.team_id}, Name={team.team_name}")
-            # # Fetch the draft picks for the league and year
-            # picks = league.draft
-            # # Iterate throug the draft picks and insert them into the database
-            # for pick in picks:
-            #     player_id = pick.playerId
-            #     team_id = pick.team.team_id
-            #     round_num = pick.round_num
-            #     round_pick = pick.round_pick
-            #     player_id = pick.playerId
-            #     # Insert the draft pick into the database
-            #     draft_picks = Draft(team_id=team_id, player_id=player_id, round_num=round_num, round_pick=round_pick, year=year)
-            #     db.add(draft_picks)
-            #     db.commit()
-            #     print(f"Inserted draft pick: Team ID={team_id}, Player ID={player_id}, Round={round_num}, Pick={round_pick}, Year={year}")
+                        #Get the playerId from players table
+                        player_id = db.query(Player).filter(Player.espnId == pick.playerId).first().id
+                        #Get the team id from teams table
+                        team_id = db.query(Team).filter(Team.teamId == pick.team.team_id, Team.year == year).first().id
+                        # Create a dictionary to store pick information
+                        pick_info = {
+                                'team_id': team_id,
+                                'overallPick': pick_index,
+                                'player_id': player_id,           # Integer ID of the player
+                                'roundNum': pick.round_num,          # Integer round number
+                                'roundPick': pick.round_pick,        # Integer pick number within the round
+                                'bidAmount': pick.bid_amount,        # Integer bid amount (for auction drafts)
+                                'keeperStatus': pick.keeper_status,  # Boolean keeper status
+                                #'nominating_team_name': None
+                            }
+                        picks_to_upsert.append(pick_info)
+
+                            # Process in batches
+                        if len(picks_to_upsert) >= batch_size:
+                            bulk_upsert_picks(picks_to_upsert)
+                            picks_to_upsert = []
+                            
+                except Exception as e:
+                    print(f"Error processing year {year}: {e}")
+                    continue
+                    
+            # Process any remaining leagues
+            if picks_to_upsert:
+                bulk_upsert_picks(picks_to_upsert)
+                
     except Exception as e:
-        print(f"An error occurred: {e}")
-    finally:
-        db.close()
+            print(f"A critical error occurred: {e}")
+            raise
+
+def bulk_upsert_picks(pick_data):
+    """
+    Perform bulk upsert operation for picks using the unique constraint.
+    """
+    with get_db_session() as db:
+        stmt = insert(Draft).values(pick_data)
+        stmt = stmt.on_conflict_do_update(
+            constraint='uix_draft_pick',  # Use the unique constraint instead
+            set_={
+                'overallPick': stmt.excluded.overallPick,
+                'roundNum': stmt.excluded.roundNum,          # Integer round number
+                'roundPick': stmt.excluded.roundPick,        # Integer pick number within the round
+                'bidAmount': stmt.excluded.bidAmount,        # Integer bid amount (for auction drafts)
+                'keeperStatus': stmt.excluded.keeperStatus,  # Boolean keeper status
+                'nominating_team_id': stmt.excluded.nominating_team_id
+            }
+        )
+        try:
+            db.execute(stmt)
+            db.commit()
+            print(f"Successfully upserted {len(pick_data)} draft picks")
+        except Exception as e:
+            db.rollback()
+            print(f"Error during bulk upsert: {e}")
+            raise
 
 def bulk_upsert_leagues(leagues_data):
     """
@@ -105,6 +114,38 @@ def bulk_upsert_leagues(leagues_data):
             db.execute(stmt)
             db.commit()
             print(f"Successfully upserted {len(leagues_data)} leagues")
+        except Exception as e:
+            db.rollback()
+            print(f"Error during bulk upsert: {e}")
+            raise
+
+def bulk_upsert_settings(setting_data):
+    """
+    Perform bulk upsert operation for leagues using the unique constraint.
+    """
+    with get_db_session() as db:
+        stmt = insert(Settings).values(setting_data)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=['league_id'],  # Use the unique constraint instead
+            set_={
+                'regularSeasonCount': stmt.excluded.regularSeasonCount,
+                'vetoVotesRequired': stmt.excluded.vetoVotesRequired,
+                'teamCount': stmt.excluded.teamCount,
+                'playoffTeamCount': stmt.excluded.playoffTeamCount,
+                'keeperCount': stmt.excluded.keeperCount,
+                'tradeDeadline': stmt.excluded.tradeDeadline,
+                'name': stmt.excluded.name,
+                'tieRule': stmt.excluded.tieRule,
+                'playoffTieRule': stmt.excluded.playoffTieRule,
+                'playoffSeedTieRule': stmt.excluded.playoffSeedTieRule,
+                'playoffMatchupPeriodLength': stmt.excluded.playoffMatchupPeriodLength,
+                'faab': stmt.excluded.faab,
+            }
+        )
+        try:
+            db.execute(stmt)
+            db.commit()
+            print(f"Successfully upserted {len(setting_data)} leagues")
         except Exception as e:
             db.rollback()
             print(f"Error during bulk upsert: {e}")
@@ -170,6 +211,64 @@ def fetch_and_populate_league(start_year, end_year):
         # Process any remaining leagues
         if leagues_to_upsert:
             bulk_upsert_leagues(leagues_to_upsert)
+            
+    except Exception as e:
+        print(f"A critical error occurred: {e}")
+        raise
+
+def fetch_and_populate_settings(start_year, end_year):
+    """
+    Fetch and populate league settings with upsert functionality.
+    Uses batch processing for better performance.
+    """
+    batch_size = 100
+    settings_to_upsert = []
+    
+    try:
+        with get_db_session() as db:
+            for year in range(start_year, end_year + 1):
+                try:
+                # First, get the league_id from the leagues table
+                    league_record = db.query(FFleague).filter(
+                        FFleague.leagueId == LEAGUE_ID,
+                        FFleague.year == year
+                    ).first()
+                    
+                    if not league_record:
+                        print(f"League record not found for year {year}")
+                        continue
+                    league = League(LEAGUE_ID, year=year, swid=SWID, espn_s2=ESPN_S2)
+                    settings = league.settings
+                    
+                    league_settings = {
+                    'league_id': league_record.id,
+                    'regularSeasonCount': settings.reg_season_count,
+                    'vetoVotesRequired': settings.veto_votes_required,
+                    'teamCount': settings.team_count,
+                    'playoffTeamCount': settings.playoff_team_count,
+                    'keeperCount': settings.keeper_count,
+                    'tradeDeadline': settings.trade_deadline,
+                    'name': settings.name,
+                    'tieRule': settings.tie_rule,
+                    'playoffTieRule': settings.playoff_tie_rule,
+                    'playoffSeedTieRule': settings.playoff_seed_tie_rule,
+                    'playoffMatchupPeriodLength': settings.playoff_matchup_period_length,
+                    'faab': settings.faab,
+                    }
+                    settings_to_upsert.append(league_settings)
+                    
+                    # Process in batches
+                    if len(settings_to_upsert) >= batch_size:
+                        bulk_upsert_settings(settings_to_upsert)
+                        settings_to_upsert = []
+                        
+                except Exception as e:
+                    print(f"Error processing year {year}: {e}")
+                    continue
+                    
+            # Process any remaining leagues
+            if settings_to_upsert:
+                bulk_upsert_settings(settings_to_upsert)
             
     except Exception as e:
         print(f"A critical error occurred: {e}")

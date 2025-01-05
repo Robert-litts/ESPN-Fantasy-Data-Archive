@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, Float, JSON, Boolean, UniqueConstraint, Index
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, Float, JSON, Boolean, UniqueConstraint, Index, BigInteger
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -16,7 +16,6 @@ class FFleague(Base):
     # Relationships
     settings = relationship("Settings", back_populates="league")
     teams = relationship("Team", back_populates="league")
-    players = relationship("Player", back_populates="league")
     
     __table_args__ = (
         UniqueConstraint('leagueId', 'year', name='uix_league_year'),
@@ -26,19 +25,17 @@ class FFleague(Base):
 class Settings(Base):
     __tablename__ = 'settings'
     id = Column(Integer, primary_key=True, autoincrement=True)
-    league_id = Column(Integer, ForeignKey('leagues.id'), nullable=False)
-    leagueId = Column(Integer, nullable=False)  # ESPN's league ID
-    year = Column(Integer, nullable=False)
+    league_id = Column(Integer, ForeignKey('leagues.id'), nullable=False, unique=True)
     regularSeasonCount = Column(Integer)
     vetoVotesRequired = Column(Integer)
     teamCount = Column(Integer)
     playoffTeamCount = Column(Integer)
     keeperCount = Column(Integer)
-    tradeDeadline = Column(Integer)
+    tradeDeadline = Column(BigInteger)
     name = Column(String(255))
-    tieRule = Column(Integer)
-    playoffTieRule = Column(Integer)
-    playoffSeedTieRule = Column(Integer)
+    tieRule = Column(String(50))
+    playoffTieRule = Column(String(50))
+    playoffSeedTieRule = Column(String(50))
     playoffMatchupPeriodLength = Column(Integer)
     faab = Column(Boolean)
     
@@ -46,8 +43,7 @@ class Settings(Base):
     league = relationship("FFleague", back_populates="settings")
     
     __table_args__ = (
-        UniqueConstraint('leagueId', 'year', name='uix_settings_league_year'),
-        Index('idx_settings_league_year', 'leagueId', 'year')
+        Index('idx_settings_league', 'league_id'),
     )
 
 class Team(Base):
@@ -101,7 +97,6 @@ class Player(Base):
     position = Column(String(50), nullable=True)
 
     # Relationships
-    league = relationship("FFleague", back_populates="players")
     rosters = relationship("Roster", back_populates="player")
     activities = relationship("Activity", back_populates="player")
     drafts = relationship("Draft", back_populates="player")
@@ -114,15 +109,14 @@ class Player(Base):
 class Draft(Base):
     __tablename__ = 'drafts'
     id = Column(Integer, primary_key=True, autoincrement=True)
-    league_id = Column(Integer, ForeignKey('leagues.id'), nullable=False)
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
-    year = Column(Integer, nullable=False)
+    overallPick = roundNum = Column(Integer, nullable=False)
     roundNum = Column(Integer, nullable=False)
     roundPick = Column(Integer, nullable=False)
     keeperStatus = Column(Boolean, default=False)
-    bidAmount = Column(Integer)
-    nominating_team_id = Column(Integer, ForeignKey('teams.id'))
+    bidAmount = Column(Integer, default=None)
+    nominating_team_id = Column(Integer, ForeignKey('teams.id'), default=None)
 
     # Relationships
     team = relationship("Team", back_populates="draft_picks", foreign_keys=[team_id])
@@ -130,8 +124,8 @@ class Draft(Base):
     nominating_team = relationship("Team", back_populates="draft_nominations", foreign_keys=[nominating_team_id])
 
     __table_args__ = (
-        UniqueConstraint('team_id', 'player_id', 'year', name='uix_draft_pick'),
-        Index('idx_draft_league_year', 'league_id', 'year')
+        UniqueConstraint('team_id', 'player_id', name='uix_draft_pick'),
+        Index('idx_draft_team_player_year', 'team_id', 'player_id')
     )
 
 class Matchup(Base):
