@@ -278,7 +278,7 @@ def fetch_and_populate_players(start_year, end_year):
     """
     Fetch and populate player data.
     """
-    batch_size = 50
+    batch_size = 1000
     players_to_upsert = []
     
     try:
@@ -435,3 +435,62 @@ def bulk_upsert_teams(teams_data):
             db.rollback()
             print(f"Error during bulk upsert: {e}")
             raise
+
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from collections import deque
+
+def fetch_players_for_year(year):
+    """
+    Fetch player data for a single year and return it.
+    This function will be run in parallel for each year.
+    """
+    players_to_upsert = []
+    try:
+        league = League(LEAGUE_ID, year=year, swid=SWID, espn_s2=ESPN_S2)
+        player_map = league.player_map
+        
+        for espnId, name in player_map.items():
+            if not isinstance(espnId, int):
+                continue
+            player_data = {
+                'espnId': espnId,
+                'name': name,
+            }
+            players_to_upsert.append(player_data)
+        
+    except Exception as e:
+        print(f"Error processing year {year}: {e}")
+    
+    return players_to_upsert
+
+def fetch_and_populate_players_concurrent(start_year, end_year):
+    """
+    Fetch and populate player data using threading for improved performance.
+    """
+    batch_size = 1000
+    players_to_upsert = deque()  # Use deque for thread-safe appending and popping
+    results = []
+    
+    # Initialize ThreadPoolExecutor with a suitable number of workers
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        # Submit tasks for each year
+        futures = {executor.submit(fetch_players_for_year, year): year for year in range(start_year, end_year + 1)}
+
+        for future in as_completed(futures):
+            year = futures[future]
+            try:
+                year_players = future.result()
+                players_to_upsert.extend(year_players)
+
+                # Process in batches
+                while len(players_to_upsert) >= batch_size:
+                    batch = [players_to_upsert.popleft() for _ in range(batch_size)]
+                    bulk_upsert_players(batch)
+
+            except Exception as e:
+                print(f"Error fetching players for year {year}: {e}")
+        
+        # Process any remaining players
+        while players_to_upsert:
+            batch = [players_to_upsert.popleft() for _ in range(min(batch_size, len(players_to_upsert)))]
+            bulk_upsert_players(batch)
