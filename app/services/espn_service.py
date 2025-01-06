@@ -5,7 +5,8 @@ from app.db.session import get_db
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy import select
 from contextlib import contextmanager
-import pandas as pd
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from collections import deque
 
 # Replace these with your actual values
 LEAGUE_ID = '747376'
@@ -436,8 +437,42 @@ def bulk_upsert_teams(teams_data):
             print(f"Error during bulk upsert: {e}")
             raise
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from collections import deque
+def fetch_draft_for_year(year):
+    """
+    Fetch draft data for a single year and return it.
+    This function will be run in parallel for each year.
+    """
+    picks_to_upsert = []
+
+    try:
+        with get_db_session() as db:
+            league = League(LEAGUE_ID, year=year, swid=SWID, espn_s2=ESPN_S2)
+            draft = league.draft
+            for pick_index, pick in enumerate(draft, 1):
+
+                #Query the database to get the player ID from 'players' table and team id
+
+                #Get the playerId from players table
+                player_id = db.query(Player).filter(Player.espnId == pick.playerId).first().id
+                #Get the team id from teams table
+                team_id = db.query(Team).filter(Team.teamId == pick.team.team_id, Team.year == year).first().id
+                # Create a dictionary to store pick information
+                pick_info = {
+                        'team_id': team_id,
+                        'overallPick': pick_index,
+                        'player_id': player_id,           # Integer ID of the player
+                        'roundNum': pick.round_num,          # Integer round number
+                        'roundPick': pick.round_pick,        # Integer pick number within the round
+                        'bidAmount': pick.bid_amount,        # Integer bid amount (for auction drafts)
+                        'keeperStatus': pick.keeper_status,  # Boolean keeper status
+                        #'nominating_team_name': None
+                    }
+                picks_to_upsert.append(pick_info)
+
+    except Exception as e:
+        print(f"Error processing year {year}: {e}")
+    
+    return picks_to_upsert
 
 def fetch_players_for_year(year):
     """
@@ -494,3 +529,36 @@ def fetch_and_populate_players_concurrent(start_year, end_year):
         while players_to_upsert:
             batch = [players_to_upsert.popleft() for _ in range(min(batch_size, len(players_to_upsert)))]
             bulk_upsert_players(batch)
+
+def fetch_and_populate_draft_concurrent(start_year, end_year):
+    """
+    Fetch and populate draft data using threading for improved performance.
+    """
+    batch_size = 1000
+    picks_to_upsert = deque()  # Use deque for thread-safe appending and popping
+    results = []
+    
+    # Initialize ThreadPoolExecutor with a suitable number of workers
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        # Submit tasks for each year
+        futures = {executor.submit(fetch_draft_for_year, year): year for year in range(start_year, end_year + 1)}
+
+        for future in as_completed(futures):
+            year = futures[future]
+            try:
+                year_draft = future.result()
+                picks_to_upsert.extend(year_draft)
+
+                # Process in batches
+                while len(picks_to_upsert) >= batch_size:
+                    batch = [picks_to_upsert.popleft() for _ in range(batch_size)]
+                    bulk_upsert_picks(batch)
+
+            except Exception as e:
+                print(f"Error fetching players for year {year}: {e}")
+        
+        # Process any remaining players
+        while picks_to_upsert:
+            batch = [picks_to_upsert.popleft() for _ in range(min(batch_size, len(picks_to_upsert)))]
+            bulk_upsert_picks(batch)
+            
