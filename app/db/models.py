@@ -156,10 +156,9 @@ class Matchup(Base):
 class Activity(Base):
     __tablename__ = 'activities'
     id = Column(Integer, primary_key=True, autoincrement=True)
-    league_id = Column(Integer, ForeignKey('leagues.id'), nullable=False)
+    date = Column(BigInteger)
     team_id = Column(Integer, ForeignKey('teams.id'))
     player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
-    year = Column(Integer, nullable=False)
     bidAmount = Column(Float)
     action = Column(String(50))
 
@@ -168,7 +167,7 @@ class Activity(Base):
     player = relationship("Player", back_populates="activities")
 
     __table_args__ = (
-        Index('idx_activity_league_year', 'league_id', 'year'),
+        Index('idx_activity_team_player', 'team_id', 'player_id'),
         Index('idx_activity_team', 'team_id')
     )
 

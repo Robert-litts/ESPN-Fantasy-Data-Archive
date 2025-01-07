@@ -7,6 +7,7 @@ from sqlalchemy import select
 from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import deque
+import asyncio
 
 # Replace these with your actual values
 LEAGUE_ID = '747376'
@@ -22,7 +23,7 @@ def get_db_session():
     finally:
         db.close()
 
-
+    
 def fetch_and_populate_draft(start_year, end_year):
     batch_size = 1000
     picks_to_upsert = []
@@ -70,6 +71,107 @@ def fetch_and_populate_draft(start_year, end_year):
     except Exception as e:
             print(f"A critical error occurred: {e}")
             raise
+
+def fetch_and_populate_draft_from_leagues(leagues: list[League]):
+    batch_size = 2000
+    picks_to_upsert = []
+
+    try:
+        with get_db_session() as db:
+            for league in leagues:
+                year=league.year
+                try:
+                    #league = League(LEAGUE_ID, year=year, swid=SWID, espn_s2=ESPN_S2)
+                    draft = league.draft
+                    for pick_index, pick in enumerate(draft, 1):
+
+                        #Query the database to get the player ID from 'players' table and team id
+
+                        #Get the playerId from players table
+                        player_id = db.query(Player).filter(Player.espnId == pick.playerId).first().id
+                        #Get the team id from teams table
+                        team_id = db.query(Team).filter(Team.teamId == pick.team.team_id, Team.year == year).first().id
+                        # Create a dictionary to store pick information
+                        pick_info = {
+                                'team_id': team_id,
+                                'overallPick': pick_index,
+                                'player_id': player_id,           # Integer ID of the player
+                                'roundNum': pick.round_num,          # Integer round number
+                                'roundPick': pick.round_pick,        # Integer pick number within the round
+                                'bidAmount': pick.bid_amount,        # Integer bid amount (for auction drafts)
+                                'keeperStatus': pick.keeper_status,  # Boolean keeper status
+                                #'nominating_team_name': None
+                            }
+                        picks_to_upsert.append(pick_info)
+
+                            # Process in batches
+                        if len(picks_to_upsert) >= batch_size:
+                            bulk_upsert_picks(picks_to_upsert)
+                            picks_to_upsert = []
+                            
+                except Exception as e:
+                    print(f"Error processing year {year}: {e}")
+                    continue
+                    
+            # Process any remaining leagues
+            if picks_to_upsert:
+                bulk_upsert_picks(picks_to_upsert)
+                
+    except Exception as e:
+            print(f"A critical error occurred: {e}")
+            raise
+
+def fetch_and_populate_matchups_from_leagues(leagues: list[League]):
+    batch_size = 2000
+    picks_to_upsert = []
+
+    try:
+        with get_db_session() as db:
+            for league in leagues:
+                year=league.year
+                weeks = len(league.teams[0].schedule)
+                for week in weeks:
+                try:
+                    #league = League(LEAGUE_ID, year=year, swid=SWID, espn_s2=ESPN_S2)
+                    activity = league.activity
+                    for pick_index, pick in enumerate(draft, 1):
+
+                        #Query the database to get the player ID from 'players' table and team id
+
+                        #Get the playerId from players table
+                        player_id = db.query(Player).filter(Player.espnId == pick.playerId).first().id
+                        #Get the team id from teams table
+                        team_id = db.query(Team).filter(Team.teamId == pick.team.team_id, Team.year == year).first().id
+                        # Create a dictionary to store pick information
+                        pick_info = {
+                                'team_id': team_id,
+                                'overallPick': pick_index,
+                                'player_id': player_id,           # Integer ID of the player
+                                'roundNum': pick.round_num,          # Integer round number
+                                'roundPick': pick.round_pick,        # Integer pick number within the round
+                                'bidAmount': pick.bid_amount,        # Integer bid amount (for auction drafts)
+                                'keeperStatus': pick.keeper_status,  # Boolean keeper status
+                                #'nominating_team_name': None
+                            }
+                        picks_to_upsert.append(pick_info)
+
+                            # Process in batches
+                        if len(picks_to_upsert) >= batch_size:
+                            bulk_upsert_picks(picks_to_upsert)
+                            picks_to_upsert = []
+                            
+                except Exception as e:
+                    print(f"Error processing year {year}: {e}")
+                    continue
+                    
+            # Process any remaining leagues
+            if picks_to_upsert:
+                bulk_upsert_picks(picks_to_upsert)
+                
+    except Exception as e:
+            print(f"A critical error occurred: {e}")
+            raise
+
 
 def bulk_upsert_picks(pick_data):
     """
