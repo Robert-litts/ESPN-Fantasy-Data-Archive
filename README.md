@@ -51,24 +51,21 @@
 ### Advanced Docker Commands
 
 ```bash
-# Build the application
-docker-compose build
-
 # Run normal extract (recommended for regular use)
-docker-compose run --rm espn-archiver
+docker-compose run --rm espn-archive
 
 # Run with cache control
-docker-compose run --rm espn-archiver python espn_archive.py --force-refresh  # Ignore cache
-docker-compose run --rm espn-archiver python espn_archive.py --no-cache       # Disable cache
+docker-compose run --rm espn-archive python espn_archive.py --force-refresh  # Ignore cache
+docker-compose run --rm espn-archive python espn_archive.py --no-cache       # Disable cache
 
 # Run only database migrations (useful for setup)
-docker-compose run --rm espn-archiver python espn_archive.py --migrations-only
+docker-compose run --rm espn-archive python espn_archive.py --migrations-only
 
 # Skip migrations (faster for regular runs)
-docker-compose run --rm espn-archiver python espn_archive.py --skip-migrations
+docker-compose run --rm espn-archive python espn_archive.py --skip-migrations
 
 # Debug mode
-docker-compose run --rm espn-archiver bash
+docker-compose run --rm espn-archive bash
 ```
 
 ### Getting ESPN Credentials
