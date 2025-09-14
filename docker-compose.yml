@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  espn-archiver:
+    build: .
+    container_name: espn-fantasy-archiver
+    env_file:
+      - .env
+    volumes:
+      - ./cache:/app/cache
+      - ./logs:/app/logs
+    restart: unless-stopped
+    command: ["python", "espn_archive.py"]
