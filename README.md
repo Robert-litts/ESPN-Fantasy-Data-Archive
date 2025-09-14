@@ -1,18 +1,6 @@
-Populate the database in the following order:
+# ESPN Fantasy Data Archive
 
-- FFleague
-- Player
-- Team
-- Settings
-- Draft
-- Roster
-- Matchup
-- Activity
-
-
-# ESPN Fantasy Data Archiver
-
- 🏈 A Python application that extracts ESPN Fantasy Sports league data and preserves it locally to ensure your fantasy data remains accessible even if ESPN removes it in the future! Data is archived in both a local Shelf file as well as in a PostgreSQL database. Archived data includes drafts, scores, rosters, transactions, and league settings!
+ 🏈 A Python application that extracts ESPN Fantasy Football league data and preserves it locally in case ESPN "misplaces" it in the future! Data is archived in both a local [Shelf](https://docs.python.org/3/library/shelve.html) file as well as in a PostgreSQL database. Archived data includes drafts, scores, rosters, transactions, and league settings!
 
 
 ## Features
@@ -26,7 +14,7 @@ Populate the database in the following order:
 
 - Docker and Docker Compose
 - PostgreSQL database (local or hosted)
-- ESPN Fantasy account with LeagueID, SWID, and S2. [See here for how to access those cookies](https://github.com/cwendt94/espn-api/discussions/150)
+- ESPN Fantasy Football account with LeagueID, SWID, and S2. [See here for how to access those cookies](https://github.com/cwendt94/espn-api/discussions/150)
 
 ## Quick Start
 
@@ -37,22 +25,7 @@ Populate the database in the following order:
    curl -O https://github.com/Robert-litts/ESPN-Fantasy-Data-Archive/docker-compose.yml
    curl -o .env https://github.com/Robert-litts/ESPN-Fantasy-Data-Archive/.env.example
    ```
-2. **Configure**
-- Configure the .env with your ESPN credentials and DATABASE_URL
-
-3. **Run:**
-   ```bash
-   docker-compose build
-   docker-compose run --rm espn-archiver
-   ```
-
-**Data is yours!** Check your PostgresDB to see your data! Also stored locally in the shelf_cache/league_cache file.
-
-## Configuration
-
-### Environment Variable Setup
-
-**Update the `.env` file with your settings:**
+2. **Update the `.env` file with your settings:**
    ```sh
     #ESPN Credentials
     LEAGUE_ID = '123456'
@@ -67,6 +40,14 @@ Populate the database in the following order:
     #Optional: Set a max cache age for Shelf, defaults to 365 days if not provided
     CACHE_MAX_AGE_DAYS=20
    ```
+3. **Run:**
+   ```bash
+   docker-compose build
+   docker-compose run --rm espn-archiver
+   ```
+
+4. **Done! Your data is now stored in your DB and in your local shelf file!** Backup your PostgresDB and Shelf file to a safe place!
+
 ### Advanced Docker Commands
 
 ```bash
@@ -109,7 +90,21 @@ The free-tier of a hosted PostgreSQL service works great for this task. No need 
 - **AWS RDS** - [AWS RDS](https://aws.amazon.com/free/database/)
 
 #### Option 2: Local PostgreSQL
-If you'd prefer to keep it local, this is also a great option.
+If you'd prefer to keep it local, this is a great option. Here's a Postgres 17 Docker Container that will get you started as a archive target.
+
+```bash
+ db:
+    image: postgres:17
+    container_name: postgres-db
+    restart: always
+    env_file:
+      - ".env"
+    volumes:
+      - ./postgres/data:/var/lib/postgresql/data
+      - ./postgres/init/:/docker-entrypoint-initdb.d/
+    ports:
+      - "5432:5432"
+```
 
 ### Data Backup
 
@@ -251,17 +246,6 @@ The application uses Python's `shelf` module for intelligent caching:
 - **Persistent storage** survives application restarts
 - **Override capabilities** for manual data refresh
 
-## Database Schema
-
-The PostgreSQL schema includes tables for:
-
-- `leagues` - League configuration and settings
-- `teams` - Team information and ownership
-- `players` - Player details and statistics  
-- `matchups` - Weekly head-to-head results
-- `transactions` - All league transactions
-- `rosters` - Historical roster compositions
-
 ## Troubleshooting
 
 ### Common Issues
@@ -269,6 +253,7 @@ The PostgreSQL schema includes tables for:
 **Authentication Errors:**
 - Verify your ESPN cookies are current and correctly formatted
 - Ensure you have access to the specified league
+- 😞 Your data may have already been deleted 
 
 **Database Connection:**
 - Check your database credentials and network access
@@ -278,23 +263,6 @@ The PostgreSQL schema includes tables for:
 - Some historical data may not be available through ESPN's API
 - Private league data requires proper authentication
 
-### Logging
-
-Enable detailed logging by setting:
-```env
-LOG_LEVEL=DEBUG
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## Dependencies
-
 ### Core Libraries
 - `espn-api` - ESPN Fantasy Sports API wrapper by cdwendt
 - `sqlalchemy` - Database ORM and toolkit
@@ -302,28 +270,15 @@ LOG_LEVEL=DEBUG
 - `psycopg2` - PostgreSQL adapter
 - `python-dotenv` - Environment variable management
 
-### Development
-- `pytest` - Testing framework
-- `black` - Code formatting
-- `flake8` - Code linting
-
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Disclaimer
 
-This tool is for personal use and data preservation. Ensure you comply with ESPN's Terms of Service and only access leagues you have permission to view. The authors are not responsible for any misuse of this software.
+This tool is for personal use and data preservation. Ensure you comply with ESPN's Terms of Service and only access leagues you have permission to view. I am not responsible for any misuse of this software.
 
 ## Acknowledgments
 
-- **cdwendt** for the excellent `espn-api` Python library
-- The ESPN Fantasy Sports community for inspiration
-- Contributors and testers who help improve this project
-
+- This wouldn't be possible without [cdwendt's](https://github.com/cwendt94) excellent [espn-api](https://github.com/cwendt94/espn-api) Python library
 ---
-
-**Need Help?** 
-- Check the [Issues](../../issues) page for common problems
-- Join our [Discussions](../../discussions) for community support
-- Review the [Wiki](../../wiki) for detailed guides
