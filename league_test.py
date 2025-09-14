@@ -3,8 +3,8 @@ LEAGUE_ID = '747376'
 #LEAGUE_ID = '368876'
 ESPN_S2 = 'AEAJA%2Fy8g05SnaVZ9KbodrBqefAHzG3RvXbFtbZuNcrMPOIwN%2F5fqKHSbwuZeAh6vVgrLOxmYT50SVKJ3wtd6LdYTOaIpe%2FG8ilQ6ijU5mZjdLfQzEW0DE1JYZTrSii%2Fi%2BcjgJcNeMFALOyeccy4ljD8tZwEbzJ5Pzp7KPk%2BLVS7H8C8RCwBnuuQUlMnlZSmS6sZz1W8F0qz06gxz5zzji4BbHp4%2BvUc%2FCzBGhDoIPXFz%2BYDteBxocWWvp3c3sYmqS6dQHeq3oQftD0C2B2yxIbGSarDN2DMj%2FLs18pKbYs6nQ%3D%3D'
 SWID = '{A88F0FF7-2664-46A3-8F0F-F7266476A3C3}'
-#league = League(LEAGUE_ID, year=2019, swid=SWID, espn_s2=ESPN_S2)
-league = League(LEAGUE_ID, year=2018)
+league = League(LEAGUE_ID, year=2019, swid=SWID, espn_s2=ESPN_S2)
+#league = League(LEAGUE_ID, year=2018)
 
 draft = league.draft
 processed_picks = []

@@ -1,8 +1,11 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from dotenv import load_dotenv
+import os
 
-# Replace this with your actual PostgreSQL database URL
-DATABASE_URL = "postgresql://robbie:password@192.168.5.178:5432/postgres?sslmode=disable"
+# Load DB URL from .env file
+load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
