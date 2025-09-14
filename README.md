@@ -42,8 +42,7 @@
    ```
 3. **Run:**
    ```bash
-   docker-compose build
-   docker-compose run --rm espn-archiver
+   docker-compose run --rm espn-archive
    ```
 
 4. **Done! Your data is now stored in your DB and in your local shelf file!** Backup your PostgresDB and Shelf file to a safe place!
