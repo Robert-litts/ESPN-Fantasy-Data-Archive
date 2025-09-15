@@ -2,6 +2,13 @@
 
  🏈 A Python application that extracts ESPN Fantasy Football league data and preserves it locally in case ESPN "misplaces" it in the future! Data is archived in both a local [Shelf](https://docs.python.org/3/library/shelve.html) file as well as in a PostgreSQL database. Archived data includes drafts, scores, rosters, transactions, and league settings!
 
+ ## Motivation
+
+ After my fantasy football league moved from ESPN to Sleeper following the 2021 season, I began looking for ways to preserve our historical league data. At some point after we moved, ESPN completely erased our fantasy football league from their website. Thankfully, I discovered that (most of) the data was still accessible through ESPN’s unofficial API.
+
+I created this project to organize and archive that data before it could be lost. In early 2025, ESPN permanently deleted all of my league history prior to 2018. Fortunately, I had already backed my data up before it could be lost.
+
+My hope is that this project helps others safeguard their fantasy football history before it’s gone for good.
 
 ## Features
 
@@ -16,7 +23,7 @@
 - PostgreSQL database (local or hosted)
 - ESPN Fantasy Football account with LeagueID, SWID, and S2. [See here for how to access those cookies](https://github.com/cwendt94/espn-api/discussions/150)
 
-## Quick Start
+## TLDR; Just Get Me My Data -- 3 Easy Steps!
 
 ### Docker with External Database (Recommended)
 

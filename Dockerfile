@@ -15,9 +15,6 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
-RUN groupadd -r espnuser && useradd -r -g espnuser espnuser
-RUN chown -R espnuser:espnuser /app
-USER espnuser
 RUN mkdir -p /app/logs /app/cache
 
 # Health check
