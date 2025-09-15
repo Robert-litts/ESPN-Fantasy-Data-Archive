@@ -1,8 +1,8 @@
 version: '3.8'
 
 services:
-  espn-archiver:
-    image: ghcr.io/robert-litts/ESPN-Fantasy-Data-Archive:latest
+  espn-archive:
+    image: ghcr.io/robert-litts/espn-fantasy-data-archive:latest
     container_name: espn-fantasy-archive
     env_file:
       - .env
@@ -10,4 +10,3 @@ services:
       - ./shelf_cache:/app/shelf_cache
       - ./logs:/app/logs
     restart: unless-stopped
-    command: ["python", "espn_archive.py"]
